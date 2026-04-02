@@ -1,9 +1,8 @@
-
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.*;
-// import java.io.File;  // removido (não utilizado)
 import java.util.ArrayList;
+import javax.swing.UIManager;
 
 enum ToolMode {
     DRAW_POINT,
@@ -291,6 +290,13 @@ class CanvasPanel extends JPanel {
 
 public class PaintApp {
 
+    private CanvasPanel canvas;
+    private JPanel tools;
+    private JButton btnPoint;
+    private JButton btnSelect;
+    private JButton btnPan;
+    private JFrame frame;
+
     // Método que carrega a fonte FontAwesome a partir de resources/fonts
     // e retorna uma instância derivada no tamanho pedido. Se falhar, retorna
     // uma fonte padrão (SansSerif) como fallback.
@@ -308,28 +314,44 @@ public class PaintApp {
         }
     }
 
-    public static void main(String[] args) {
-        JFrame frame = new JFrame("Mini Paint - Computação Gráfica");
+    public PaintApp() {
+        init();
+    }
+
+    private void init() {
+        frame = new JFrame("Mini Paint - Computação Gráfica");
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         frame.setSize(800, 600);
 
-        CanvasPanel canvas = new CanvasPanel();
+        canvas = new CanvasPanel();
 
-        JPanel tools = new JPanel();
-        tools.setPreferredSize(new Dimension(800, 60));
+        tools = new JPanel();
+        tools.setPreferredSize(new Dimension(800, 40));
         tools.setLayout(new FlowLayout(FlowLayout.LEFT, 5, 5));
 
         Font faFont = loadFont(18f);
-        JButton btnPoint = new JButton("\uf111");
-        JButton btnSelect = new JButton("\uf245");
-        JButton btnPan = new JButton("\uf256");
+        btnPoint = new JButton("\uf111");
+        btnSelect = new JButton("\uf245");
+        btnPan = new JButton("\uf256");
         btnPoint.setFont(faFont);
         btnSelect.setFont(faFont);
         btnPan.setFont(faFont);
 
-        btnPoint.addActionListener(e -> canvas.setMode(ToolMode.DRAW_POINT));
-        btnSelect.addActionListener(e -> canvas.setMode(ToolMode.SELECT));
-        btnPan.addActionListener(e -> canvas.setMode(ToolMode.PAN));
+        btnPoint.addActionListener(e -> {
+            canvas.setMode(ToolMode.DRAW_POINT);
+            updateToolButtons();
+            canvas.repaint();
+        });
+        btnSelect.addActionListener(e -> {
+            canvas.setMode(ToolMode.SELECT);
+            updateToolButtons();
+            canvas.repaint();
+        });
+        btnPan.addActionListener(e -> {
+            canvas.setMode(ToolMode.PAN);
+            updateToolButtons();
+            canvas.repaint();
+        });
 
         tools.add(btnPoint);
         tools.add(btnSelect);
@@ -340,5 +362,34 @@ public class PaintApp {
         frame.add(tools, BorderLayout.NORTH);
 
         frame.setVisible(true);
+
+        updateToolButtons();
+    }
+
+    /**
+     * Updates button backgrounds
+     */
+    private void updateToolButtons() {
+        if (canvas == null) return;
+        Color highlight = new Color(173, 216, 230);
+        Color normal = UIManager.getColor("Button.background");
+
+        btnPoint.setBackground(canvas.currentMode == ToolMode.DRAW_POINT ? highlight : normal);
+        btnSelect.setBackground(canvas.currentMode == ToolMode.SELECT ? highlight : normal);
+        btnPan.setBackground(canvas.currentMode == ToolMode.PAN ? highlight : normal);
+
+        // Tooltips
+        btnPoint.setToolTipText("Draw Point");
+        btnSelect.setToolTipText("Select");
+        btnPan.setToolTipText("Move");
+
+        btnPoint.repaint();
+        btnSelect.repaint();
+        btnPan.repaint();
+    }
+
+    public static void main(String[] args) {
+        SwingUtilities.invokeLater(() -> new PaintApp());
     }
 }
+

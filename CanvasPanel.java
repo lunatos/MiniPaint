@@ -8,6 +8,7 @@ interface CanvasListener {
 }
 
 class CanvasPanel extends JPanel {
+
     CanvasListener listener;
     ArrayList<Shape> shapes = new ArrayList<>();
     ToolMode currentMode = ToolMode.DRAW_POINT;
@@ -115,8 +116,7 @@ class CanvasPanel extends JPanel {
         if (rotationCenter == null)
             return;
 
-        // Populate tempShapes from original clones each time for consistent rotation
-        // from original positions
+        // Populate tempShapes from original clones each
         tempShapes.clear();
         for (Shape orig : originalShapes) {
             Shape temp = orig.clone();
@@ -156,7 +156,7 @@ class CanvasPanel extends JPanel {
                         for (int i = 0; i < 4; i++) {
                             poly.addPoint(rotatedRect[i].x, rotatedRect[i].y);
                         }
-                        
+
                         if (poly.contains(startX, startY)) {
                             drag = true;
                             return;
@@ -196,27 +196,34 @@ class CanvasPanel extends JPanel {
                             }
                         }
 
-                        for (int i = 0; i < 4; i++) {
-                            Point p;
-                            switch (i) {
-                                case 0:
-                                    p = new Point(selectionRect.x, selectionRect.y);
-                                    break;
-                                case 1:
-                                    p = new Point(selectionRect.x + selectionRect.width, selectionRect.y);
-                                    break;
-                                case 2:
-                                    p = new Point(selectionRect.x + selectionRect.width,
-                                            selectionRect.y + selectionRect.height);
-                                    break;
-                                case 3:
-                                    p = new Point(selectionRect.x, selectionRect.y + selectionRect.height);
-                                    break;
-                                default:
-                                    p = new Point();
-                                    break;
+                        if (rotatedRect[0] != null) {
+                            for (int i = 0; i < 4; i++) {
+                                Point p = new Point(rotatedRect[i].x, rotatedRect[i].y);
+                                originalRectPoints.add(p);
                             }
-                            originalRectPoints.add(p);
+                        } else if (selectionRect != null) {
+                            for (int i = 0; i < 4; i++) {
+                                Point p;
+                                switch (i) {
+                                    case 0:
+                                        p = new Point(selectionRect.x, selectionRect.y);
+                                        break;
+                                    case 1:
+                                        p = new Point(selectionRect.x + selectionRect.width, selectionRect.y);
+                                        break;
+                                    case 2:
+                                        p = new Point(selectionRect.x + selectionRect.width,
+                                                selectionRect.y + selectionRect.height);
+                                        break;
+                                    case 3:
+                                        p = new Point(selectionRect.x, selectionRect.y + selectionRect.height);
+                                        break;
+                                    default:
+                                        p = new Point();
+                                        break;
+                                }
+                                originalRectPoints.add(p);
+                            }
                         }
                         for (Shape s : shapes) {
                             if (s.selected) {
@@ -418,7 +425,6 @@ class CanvasPanel extends JPanel {
                 }
             }
         });
-
     }
 
     @Override
@@ -448,7 +454,7 @@ class CanvasPanel extends JPanel {
             polygonPreviewLine.draw(g2, offsetX, offsetY, true);
         }
 
-        // Draw polygon close hint circle
+        // Draw polygon close hint circle fo closing the polygon
         if (showCloseHint && closeHintPoint != null) {
             g2.setColor(Color.RED);
             g2.setStroke(new BasicStroke(2f));
@@ -461,20 +467,17 @@ class CanvasPanel extends JPanel {
 
         // Draw selection rectangle or rotated rectangle
         if (selectionRect != null) {
-            g2.setColor(Color.GRAY);
+            g2.setColor(Color.BLACK);
             if (currentMode == ToolMode.EDIT) {
-                g2.setStroke(new BasicStroke(2f));
+                g2.setStroke(new BasicStroke(3f));
             } else {
-                float[] dash = { 6f, 6f };
-                g2.setStroke(new BasicStroke(1f, BasicStroke.CAP_BUTT, BasicStroke.JOIN_MITER, 10f, dash, 0f));
-                if (currentMode == ToolMode.ROTATE) {
-                    g2.setColor(Color.BLUE);
-                }
+                float[] dash = { 8f, 4f };
+                g2.setStroke(new BasicStroke(3f, BasicStroke.CAP_BUTT, BasicStroke.JOIN_MITER, 10f, dash, 0f));
             }
             if (rotatedRect[0] != null) {
                 Polygon poly = new Polygon();
                 for (int i = 0; i < 4; i++) {
-                    poly.addPoint(rotatedRect[i].x, rotatedRect[i].y);
+                    poly.addPoint(rotatedRect[i].x + offsetX, rotatedRect[i].y + offsetY);
                 }
                 g2.draw(poly);
             } else {

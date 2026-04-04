@@ -1,10 +1,4 @@
-import java.awt.Color;
-import java.awt.Graphics;
-import java.awt.Graphics2D;
-import java.awt.Rectangle;
-import java.awt.Point;
-import java.awt.Polygon;
-import java.awt.BasicStroke;
+import java.awt.*;
 import java.util.List;
 import java.util.ArrayList;
 import static java.lang.Math.*;
@@ -62,14 +56,9 @@ class Point2D extends Shape {
     @Override
     public void draw(Graphics g, int offsetX, int offsetY, boolean highlight) {
         Graphics2D g2 = (Graphics2D) g;
-        if (selected) {
-            g2.setColor(Color.RED);
-        } else if (highlight) {
-            g2.setColor(Color.BLUE);
-        } else {
-            g2.setColor(Color.BLACK);
-        }
+        Utils.prepareShapeGraphics(g2, selected, highlight);
         g2.fillOval(x + offsetX - 4, y + offsetY - 4, 6, 6);
+        Utils.resetStroke(g2);
     }
 
     @Override
@@ -147,18 +136,9 @@ class Line2D extends Shape {
     @Override
     public void draw(Graphics g, int offsetX, int offsetY, boolean highlight) {
         Graphics2D g2 = (Graphics2D) g;
-        if (selected) {
-            g2.setColor(Color.RED);
-            g2.setStroke(new BasicStroke(3));
-        } else if (highlight) {
-            g2.setColor(Color.BLUE);
-            g2.setStroke(new BasicStroke(3));
-        } else {
-            g2.setColor(Color.BLACK);
-            g2.setStroke(new BasicStroke(2));
-        }
+        Utils.prepareShapeGraphics(g2, selected, highlight);
         g2.drawLine(x1 + offsetX, y1 + offsetY, x2 + offsetX, y2 + offsetY);
-        g2.setStroke(new BasicStroke(2));
+        Utils.resetStroke(g2);
     }
 
     @Override
@@ -245,14 +225,9 @@ class Circle2D extends Shape {
     @Override
     public void draw(Graphics g, int offsetX, int offsetY, boolean highlight) {
         Graphics2D g2 = (Graphics2D) g;
-        if (selected) {
-            g2.setColor(Color.RED);
-        } else if (highlight) {
-            g2.setColor(Color.BLUE);
-        } else {
-            g2.setColor(Color.BLACK);
-        }
+        Utils.prepareShapeGraphics(g2, selected, highlight);
         g2.drawOval(cx + offsetX - radius, cy + offsetY - radius, 2 * radius, 2 * radius);
+        Utils.resetStroke(g2);
     }
 
     @Override
@@ -335,24 +310,13 @@ class Polygon2D extends Shape {
     @Override
     public void draw(Graphics g, int offsetX, int offsetY, boolean highlight) {
         Graphics2D g2 = (Graphics2D) g;
-        if (selected) {
-            g2.setColor(Color.RED);
-            g2.setStroke(new BasicStroke(3));
-        } else if (highlight) {
-            g2.setColor(Color.BLUE);
-            g2.setStroke(new BasicStroke(3));
-        } else {
-            g2.setColor(Color.BLACK);
-            g2.setStroke(new BasicStroke(1));
-        }
+        Utils.prepareShapeGraphics(g2, selected, highlight);
         Polygon poly = new Polygon();
         for (Point2D v : vertices) {
             poly.addPoint(v.x + offsetX, v.y + offsetY);
         }
-
         g2.drawPolyline(poly.xpoints, poly.ypoints, vertices.size());
-
-        g2.setStroke(new BasicStroke(1));
+        Utils.resetStroke(g2);
     }
 
     @Override

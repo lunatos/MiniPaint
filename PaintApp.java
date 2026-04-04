@@ -7,6 +7,9 @@ public class PaintApp implements CanvasListener {
     private CanvasPanel canvas;
     private JPanel tools;
     private JButton btnPoint;
+    private JButton btnLine;
+    private JButton btnCircle;
+    private JButton btnPolygon;
     private JButton btnSelect;
     private JButton btnPan;
     private JButton btnRotate;
@@ -42,34 +45,56 @@ public class PaintApp implements CanvasListener {
         tools.setLayout(new FlowLayout(FlowLayout.LEFT, 5, 5));
 
         Font faFont = loadFont(18f);
-        btnPoint = new JButton("\uf111");
-        btnSelect = new JButton("\uf245");
+        btnPoint = new JButton("\uf192");
+        btnLine = new JButton("--");
+        btnCircle = new JButton("\uf111");
+        btnPolygon = new JButton("\ue4e2");
+        btnSelect = new JButton("\uf565");
         btnPan = new JButton("\uf256");
         btnRotate = new JButton("\uf01e");
+
         btnPoint.setFont(faFont);
+        btnLine.setFont(faFont);
+        btnCircle.setFont(faFont);
         btnSelect.setFont(faFont);
         btnPan.setFont(faFont);
         btnRotate.setFont(faFont);
+        btnPolygon.setFont(faFont);
+        
+        btnPoint.setToolTipText("Draw Point");
+        btnLine.setToolTipText("Draw Line On Drag");
+        btnCircle.setToolTipText("Draw Circle On Drag");
+        btnSelect.setToolTipText("Select On Drag");
+        btnPan.setToolTipText("Pan On Drag");
+        btnRotate.setToolTipText("Rotate On Drag");
+        btnPolygon.setToolTipText("Draw Polygon On Click");
 
         btnPoint.addActionListener(e -> {
-            canvas.clearSelectionForDrawing();
             canvas.setMode(ToolMode.DRAW_POINT);
-            canvas.repaint();
+        });
+        btnLine.addActionListener(e -> {
+            canvas.setMode(ToolMode.DRAW_LINE);
+        });
+        btnCircle.addActionListener(e -> {
+            canvas.setMode(ToolMode.DRAW_CIRCLE);
+        });
+        btnPolygon.addActionListener(e -> {
+            canvas.setMode(ToolMode.DRAW_POLYGON);
         });
         btnSelect.addActionListener(e -> {
             canvas.setMode(ToolMode.SELECT);
-            canvas.repaint();
         });
         btnPan.addActionListener(e -> {
             canvas.setMode(ToolMode.PAN);
-            canvas.repaint();
         });
         btnRotate.addActionListener(e -> {
             canvas.setMode(ToolMode.ROTATE);
-            canvas.repaint();
         });
 
         tools.add(btnPoint);
+        tools.add(btnLine);
+        tools.add(btnCircle);
+        tools.add(btnPolygon);
         tools.add(btnSelect);
         tools.add(btnPan);
         tools.add(btnRotate);
@@ -83,6 +108,7 @@ public class PaintApp implements CanvasListener {
         updateToolButtons();
     }
 
+    @Override
     public void updateToolButtons() {
         if (canvas == null)
             return;
@@ -90,24 +116,25 @@ public class PaintApp implements CanvasListener {
         Color normal = UIManager.getColor("Button.background");
 
         btnPoint.setBackground(canvas.getCurrentMode() == ToolMode.DRAW_POINT ? highlight : normal);
-        btnSelect.setBackground(canvas.getCurrentMode() == ToolMode.SELECT ? highlight
-                : canvas.getCurrentMode() == ToolMode.EDIT ? highlight : normal);
+        btnLine.setBackground(canvas.getCurrentMode() == ToolMode.DRAW_LINE ? highlight : normal);
+        btnCircle.setBackground(canvas.getCurrentMode() == ToolMode.DRAW_CIRCLE ? highlight : normal);
+        btnPolygon.setBackground(canvas.getCurrentMode() == ToolMode.DRAW_POLYGON ? highlight : normal);
+        btnSelect.setBackground(
+                (canvas.getCurrentMode() == ToolMode.SELECT || canvas.getCurrentMode() == ToolMode.EDIT) ? highlight
+                        : normal);
         btnPan.setBackground(canvas.getCurrentMode() == ToolMode.PAN ? highlight : normal);
         btnRotate.setBackground(canvas.getCurrentMode() == ToolMode.ROTATE ? highlight : normal);
 
-        // Tooltips
-        btnPoint.setToolTipText("Draw Point");
-        btnSelect.setToolTipText("Select");
-        btnPan.setToolTipText("Pan");
-        btnRotate.setToolTipText("Rotate");
-
         btnPoint.repaint();
+        btnLine.repaint();
+        btnCircle.repaint();
         btnSelect.repaint();
         btnPan.repaint();
         btnRotate.repaint();
+        btnPolygon.repaint();
     }
+
     public static void main(String[] args) {
         SwingUtilities.invokeLater(() -> new PaintApp());
     }
 }
-

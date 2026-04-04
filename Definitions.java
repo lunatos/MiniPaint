@@ -40,6 +40,10 @@ abstract class Shape {
     abstract boolean isPolygon();
 
     abstract boolean isPoint();
+
+    public Shape clone() {
+        throw new UnsupportedOperationException("Must override clone in subclasses");
+    }
 }
 
 class Point2D extends Shape {
@@ -48,6 +52,11 @@ class Point2D extends Shape {
     public Point2D(int x, int y) {
         this.x = x;
         this.y = y;
+    }
+
+    public Point2D(int x, int y, boolean selected) {
+        this(x, y);
+        this.selected = selected;
     }
 
     @Override
@@ -113,6 +122,11 @@ class Point2D extends Shape {
     public boolean isPoint() {
         return true;
     }
+
+    @Override
+    public Point2D clone() {
+        return new Point2D(x, y, selected);
+    }
 }
 
 class Line2D extends Shape {
@@ -123,6 +137,11 @@ class Line2D extends Shape {
         this.y1 = y1;
         this.x2 = x2;
         this.y2 = y2;
+    }
+
+    public Line2D(int x1, int y1, int x2, int y2, boolean selected) {
+        this(x1, y1, x2, y2);
+        this.selected = selected;
     }
 
     @Override
@@ -200,6 +219,11 @@ class Line2D extends Shape {
     public boolean isPoint() {
         return false;
     }
+
+    @Override
+    public Line2D clone() {
+        return new Line2D(x1, y1, x2, y2, selected);
+    }
 }
 
 class Circle2D extends Shape {
@@ -209,6 +233,13 @@ class Circle2D extends Shape {
         this.cx = cx;
         this.cy = cy;
         this.radius = radius;
+    }
+
+    public Circle2D(int cx, int cy, int radius, boolean selected) {
+        this.cx = cx;
+        this.cy = cy;
+        this.radius = radius;
+        this.selected = selected;
     }
 
     @Override
@@ -278,6 +309,11 @@ class Circle2D extends Shape {
     public boolean isPoint() {
         return false;
     }
+
+    @Override
+    public Circle2D clone() {
+        return new Circle2D(cx, cy, radius, selected);
+    }
 }
 
 class Polygon2D extends Shape {
@@ -285,6 +321,11 @@ class Polygon2D extends Shape {
 
     public Polygon2D(List<Point2D> verts) {
         vertices = new ArrayList<>(verts);
+    }
+
+    public Polygon2D(List<Point2D> verts, boolean selected) {
+        vertices = new ArrayList<>(verts);
+        this.selected = selected;
     }
 
     public void add(int x, int y) {
@@ -362,5 +403,14 @@ class Polygon2D extends Shape {
     @Override
     public boolean isPoint() {
         return false;
+    }
+
+    @Override
+    public Polygon2D clone() {
+        ArrayList<Point2D> clonedVerts = new ArrayList<>();
+        for (Point2D v : vertices) {
+            clonedVerts.add(v.clone());
+        }
+        return new Polygon2D(clonedVerts, selected);
     }
 }

@@ -9,6 +9,7 @@ public class PaintApp implements CanvasListener {
     private JFrame frame;
     private final Map<ToolMode, JButton> modeButtons = new LinkedHashMap<>();
     private final Color highlightColor = new Color(173, 216, 230);
+    private JButton reflectXBtn, reflectYBtn, reflectXYBtn;
 
     private static Font loadFont(float size) {
         try (java.io.InputStream is = PaintApp.class.getResourceAsStream("/fonts/fa-solid-900.otf")) {
@@ -39,13 +40,35 @@ public class PaintApp implements CanvasListener {
         Font faFont = loadFont(18f);
 
         // Define tool buttons
-        addToolButton(tools, "ToolMode.DRAW_POINT", "\uf192", "Draw Point", ToolMode.DRAW_POINT, faFont);
-        addToolButton(tools, "ToolMode.DRAW_LINE", "--", "Draw Line On Drag", ToolMode.DRAW_LINE, faFont);
-        addToolButton(tools, "ToolMode.DRAW_CIRCLE", "\uf111", "Draw Circle On Drag", ToolMode.DRAW_CIRCLE, faFont);
-        addToolButton(tools, "ToolMode.DRAW_POLYGON", "\ue4e2", "Draw Polygon On Click", ToolMode.DRAW_POLYGON, faFont);
-        addToolButton(tools, "ToolMode.SELECT", "\uf565", "Select On Drag", ToolMode.SELECT, faFont);
-        addToolButton(tools, "ToolMode.PAN", "\uf256", "Pan On Drag", ToolMode.PAN, faFont);
-        addToolButton(tools, "ToolMode.ROTATE", "\uf01e", "Rotate On Drag", ToolMode.ROTATE, faFont);
+        addToolButton(tools, "\uf192", "Draw Point", ToolMode.DRAW_POINT, faFont);
+        addToolButton(tools, "--", "Draw Line On Drag", ToolMode.DRAW_LINE, faFont);
+        addToolButton(tools, "\uf111", "Draw Circle On Drag", ToolMode.DRAW_CIRCLE, faFont);
+        addToolButton(tools, "\ue4e2", "Draw Polygon On Click", ToolMode.DRAW_POLYGON, faFont);
+        addToolButton(tools, "\uf065", "Select On Drag", ToolMode.SELECT, faFont);
+        addToolButton(tools, "\uf256", "Pan On Drag", ToolMode.PAN, faFont);
+        addToolButton(tools, "\uf2f1", "Rotate On Drag", ToolMode.ROTATE, faFont);
+        addToolButton(tools, "\uf31e", "Scale On Drag", ToolMode.SCALE, faFont);
+
+        // Reflection buttons
+        tools.add(new JSeparator(JSeparator.VERTICAL));
+
+        reflectXBtn = new JButton("\u0058");
+        reflectXBtn.setFont(faFont);
+        reflectXBtn.setToolTipText("Reflect X");
+        reflectXBtn.addActionListener(e -> canvas.reflectX());
+        tools.add(reflectXBtn);
+
+        reflectYBtn = new JButton("\u0059");
+        reflectYBtn.setFont(faFont);
+        reflectYBtn.setToolTipText("Reflect Y");
+        reflectYBtn.addActionListener(e -> canvas.reflectY());
+        tools.add(reflectYBtn);
+        
+        reflectXYBtn = new JButton("\u0058 \u0059");
+        reflectXYBtn.setFont(faFont);
+        reflectXYBtn.setToolTipText("Reflect XY");
+        reflectXYBtn.addActionListener(e -> canvas.reflectXY());
+        tools.add(reflectXYBtn);
 
         frame.setLayout(new BorderLayout());
         frame.add(canvas, BorderLayout.CENTER);
@@ -55,7 +78,7 @@ public class PaintApp implements CanvasListener {
         updateToolButtons();
     }
 
-    private void addToolButton(JPanel panel, String key, String text, String tooltip, ToolMode mode, Font font) {
+    private void addToolButton(JPanel panel, String text, String tooltip, ToolMode mode, Font font) {
         JButton btn = new JButton(text);
         btn.setFont(font);
         btn.setToolTipText(tooltip);

@@ -14,7 +14,8 @@ enum ToolMode {
     SELECT,
     EDIT,
     PAN,
-    ROTATE
+    ROTATE,
+    SCALE
 }
 
 abstract class Shape {
@@ -27,6 +28,8 @@ abstract class Shape {
     abstract void translate(int dx, int dy);
 
     abstract void rotate(Point center, double angle);
+
+    abstract void scale(Point center, double scaleX, double scaleY);
 
     public abstract Shape clone();
 
@@ -84,6 +87,12 @@ class Point2D extends Shape {
         Point rotated = Shape.rotatePoint(x, y, center, angle);
         x = rotated.x;
         y = rotated.y;
+    }
+
+    @Override
+    public void scale(Point center, double scaleX, double scaleY) {
+        x = center.x + (int) ((x - center.x) * scaleX);
+        y = center.y + (int) ((y - center.y) * scaleY);
     }
 
     @Override
@@ -145,6 +154,14 @@ class Line2D extends Shape {
     }
 
     @Override
+    public void scale(Point center, double scaleX, double scaleY) {
+        x1 = center.x + (int) ((x1 - center.x) * scaleX);
+        y1 = center.y + (int) ((y1 - center.y) * scaleY);
+        x2 = center.x + (int) ((x2 - center.x) * scaleX);
+        y2 = center.y + (int) ((y2 - center.y) * scaleY);
+    }
+
+    @Override
     public Line2D clone() {
         return new Line2D(x1, y1, x2, y2, selected);
     }
@@ -193,6 +210,13 @@ class Circle2D extends Shape {
         Point rotated = Shape.rotatePoint(cx, cy, center, angle);
         cx = rotated.x;
         cy = rotated.y;
+    }
+
+    @Override
+    public void scale(Point center, double scaleX, double scaleY) {
+        cx = center.x + (int) ((cx - center.x) * scaleX);
+        cy = center.y + (int) ((cy - center.y) * scaleY);
+        radius = (int) (radius * Math.sqrt(scaleX * scaleX + scaleY * scaleY) / Math.sqrt(2));
     }
 
     @Override
@@ -248,6 +272,12 @@ class Polygon2D extends Shape {
     public void rotate(Point center, double angle) {
         for (Point2D v : vertices)
             v.rotate(center, angle);
+    }
+
+    @Override
+    public void scale(Point center, double scaleX, double scaleY) {
+        for (Point2D v : vertices)
+            v.scale(center, scaleX, scaleY);
     }
 
     @Override

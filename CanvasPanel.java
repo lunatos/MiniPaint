@@ -15,21 +15,29 @@ class CanvasPanel extends JPanel {
     private final ArrayList<Shape> shapes = new ArrayList<>();
 
     private ToolMode currentMode = ToolMode.DRAW_POINT;
-    private Rectangle selectionRect = null;
     private Shape previewShape = null;
     private Line2D polygonPreviewLine = null;
 
     private boolean showCloseHint = false;
     private Point closeHintPoint = null;
 
-    // rotation state
-    private Point rotationCenter = null;
+    // bounding rect of selection
+    private Point[] selectionRect = new Point[4];
+
+    // rotation/scale state
+    private Point transformCenter = null;
     private double startAngle = 0;
     private final ArrayList<Shape> tempShapes = new ArrayList<>();
     private final ArrayList<Point> originalRectPoints = new ArrayList<>();
     private final ArrayList<Shape> originalShapes = new ArrayList<>();
-    private double totalRotationAngle = 0.0;
-    private Point[] rotatedRect = new Point[4];
+    private double totalTransformAngle = 0.0;
+
+    // cumulative rotation angle (normalized to [-PI, PI])
+    private double rotationAngle = 0.0;
+
+    // scale state
+    private Point scaleCenter = null;
+    private double startScaleDistance = 0;
 
     // pan/transform
     private int offsetX = 0, offsetY = 0;
@@ -48,7 +56,33 @@ class CanvasPanel extends JPanel {
     }
 
     private boolean isSelectionMode() {
-        return currentMode == ToolMode.SELECT || currentMode == ToolMode.EDIT || currentMode == ToolMode.ROTATE;
+        return currentMode == ToolMode.SELECT || currentMode == ToolMode.EDIT || currentMode == ToolMode.ROTATE || currentMode == ToolMode.SCALE;
+    }
+
+    // ---- Selection rect helpers ----
+    private static boolean hasSelection(Point[] rect) {
+        return rect[0] != null;
+    }
+
+    private static void clearSelectionRect(Point[] rect) {
+        for (int i = 0; i < 4; i++) rect[i] = null;
+    }
+
+    private static void setSelectionRectFromDrag(Point[] rect, int x1, int y1, int x2, int y2) {
+        int rx = Math.min(x1, x2);
+        int ry = Math.min(y1, y2);
+        int rw = Math.abs(x1 - x2);
+        int rh = Math.abs(y1 - y2);
+        rect[0] = new Point(rx, ry);
+        rect[1] = new Point(rx + rw, ry);
+        rect[2] = new Point(rx + rw, ry + rh);
+        rect[3] = new Point(rx, ry + rh);
+    }
+
+    private static Point[] clonePoints(Point[] src) {
+        Point[] dst = new Point[4];
+        for (int i = 0; i < 4; i++) dst[i] = new Point(src[i].x, src[i].y);
+        return dst;
     }
 
     public void restartSelection() {
@@ -64,8 +98,8 @@ class CanvasPanel extends JPanel {
 
     public void clearSelectionForDrawing() {
         clearSelection();
-        selectionRect = null;
-        rotatedRect = new Point[4];
+        clearSelectionRect(selectionRect);
+        rotationAngle = 0.0;
         repaint();
     }
 
@@ -84,18 +118,9 @@ class CanvasPanel extends JPanel {
     }
 
     public void translate(int dx, int dy) {
-        if (selectionRect != null) {
-            if (rotatedRect[0] != null) {
-                Polygon poly = new Polygon();
-                for (int i = 0; i < 4; i++) {
-                    poly.addPoint(rotatedRect[i].x, rotatedRect[i].y);
-                }
-                poly.translate(dx, dy);
-                for (int i = 0; i < 4; i++) {
-                    rotatedRect[i] = new Point(poly.xpoints[i], poly.ypoints[i]);
-                }
-            } else {
-                selectionRect.translate(dx, dy);
+        if (hasSelection(selectionRect)) {
+            for (int i = 0; i < 4; i++) {
+                selectionRect[i] = new Point(selectionRect[i].x + dx, selectionRect[i].y + dy);
             }
         }
         for (Shape s : shapes) {
@@ -106,54 +131,25 @@ class CanvasPanel extends JPanel {
         repaint();
     }
 
-    private Point getCenterSelected() {
-        if (selectionRect == null)
-            return null;
-        return new Point(selectionRect.x + selectionRect.width / 2 - offsetX,
-                selectionRect.y + selectionRect.height / 2 - offsetY);
+    public Point getCenterSelected() {
+        if (!hasSelection(selectionRect)) return null;
+        int cx = 0, cy = 0;
+        for (int i = 0; i < 4; i++) {
+            cx += selectionRect[i].x;
+            cy += selectionRect[i].y;
+        }
+        return new Point(cx / 4, cy / 4);
     }
 
     private double normalizeAngle(double angle) {
-        while (angle < -Math.PI)
-            angle += 2 * Math.PI;
-        while (angle > Math.PI)
-            angle -= 2 * Math.PI;
-        return angle;
-    }
-
-    public void rotate(double angle) {
-        if (rotationCenter == null)
-            return;
-
-        tempShapes.clear();
-        for (Shape orig : originalShapes) {
-            Shape temp = orig.clone();
-            temp.rotate(rotationCenter, angle);
-            tempShapes.add(temp);
-        }
-
-        for (int i = 0; i < 4; i++) {
-            Point orig = originalRectPoints.get(i);
-            rotatedRect[i] = Shape.rotatePoint(orig.x, orig.y, rotationCenter, angle);
-        }
-        repaint();
-    }
-
-    // ---- Rect corners helper ----
-    private ArrayList<Point> getRectCorners(Rectangle rect) {
-        ArrayList<Point> corners = new ArrayList<>(4);
-        corners.add(new Point(rect.x, rect.y));
-        corners.add(new Point(rect.x + rect.width, rect.y));
-        corners.add(new Point(rect.x + rect.width, rect.y + rect.height));
-        corners.add(new Point(rect.x, rect.y + rect.height));
-        return corners;
+        return angle % (2 * Math.PI);
     }
 
     // ---- Drawing helpers ----
-    private static Point[] buildRotatedPolygon(Point[] rotatedRect, int offX, int offY) {
+    private static Point[] buildSelectionPolygon(Point[] rect, int offX, int offY) {
         Point[] pts = new Point[4];
         for (int i = 0; i < 4; i++) {
-            pts[i] = new Point(rotatedRect[i].x + offX, rotatedRect[i].y + offY);
+            pts[i] = new Point(rect[i].x + offX, rect[i].y + offY);
         }
         return pts;
     }
@@ -173,17 +169,12 @@ class CanvasPanel extends JPanel {
                 lastY = startY;
 
                 if (currentMode == ToolMode.EDIT) {
-                    if (rotatedRect[0] != null) {
+                    if (hasSelection(selectionRect)) {
                         Polygon poly = new Polygon();
                         for (int i = 0; i < 4; i++) {
-                            poly.addPoint(rotatedRect[i].x, rotatedRect[i].y);
+                            poly.addPoint(selectionRect[i].x, selectionRect[i].y);
                         }
                         if (poly.contains(startX, startY)) {
-                            drag = true;
-                            return;
-                        }
-                    } else {
-                        if (selectionRect != null && selectionRect.contains(startX, startY)) {
                             drag = true;
                             return;
                         }
@@ -193,11 +184,13 @@ class CanvasPanel extends JPanel {
 
                 } else if (currentMode == ToolMode.SELECT) {
                     clearSelection();
-                    selectionRect = new Rectangle(startX, startY, 0, 0);
                     drag = false;
 
                 } else if (currentMode == ToolMode.ROTATE) {
                     startRotation();
+
+                } else if (currentMode == ToolMode.SCALE) {
+                    startScale();
 
                 } else if (isDrawMode()) {
                     handleDrawPress(e);
@@ -214,17 +207,21 @@ class CanvasPanel extends JPanel {
                     offsetX += x - lastX;
                     offsetY += y - lastY;
                 } else if (currentMode == ToolMode.SELECT) {
-                    int rx = Math.min(startX, x);
-                    int ry = Math.min(startY, y);
-                    int rw = Math.abs(startX - x);
-                    int rh = Math.abs(startY - y);
-                    selectionRect = new Rectangle(rx, ry, rw, rh);
+                    setSelectionRectFromDrag(selectionRect, startX, startY, x, y);
                 } else if (currentMode == ToolMode.EDIT && drag) {
                     translate(x - lastX, y - lastY);
-                } else if (currentMode == ToolMode.ROTATE && rotationCenter != null) {
-                    double currentAngle = Math.atan2(y - rotationCenter.y, x - rotationCenter.x);
-                    totalRotationAngle = normalizeAngle(currentAngle - startAngle);
-                    rotate(totalRotationAngle);
+                } else if (currentMode == ToolMode.ROTATE && transformCenter != null) {
+                    double currentAngle = Math.atan2(y - transformCenter.y, x - transformCenter.x);
+                    totalTransformAngle = normalizeAngle(currentAngle - startAngle);
+                    rotate(totalTransformAngle);
+                } else if (currentMode == ToolMode.SCALE && scaleCenter != null) {
+                    double dx = x - scaleCenter.x;
+                    double dy = y - scaleCenter.y;
+                    if (startScaleDistance > 0) {
+                        double currentDist = Math.hypot(dx, dy);
+                        double factor = currentDist / startScaleDistance;
+                        scale(factor, factor);
+                    }
                 } else if (isDrawMode()) {
                     handleDrawDrag(x, y);
                 }
@@ -270,15 +267,26 @@ class CanvasPanel extends JPanel {
                     if (currentMode != ToolMode.DRAW_POLYGON && previewShape != null) {
                         shapes.add(previewShape);
                     }
-                } else if (currentMode == ToolMode.SELECT) {
-                    if (selectionRect != null) {
-                        for (Shape s : shapes) {
-                            s.selected = s.isFullyInside(selectionRect, offsetX, offsetY);
-                        }
-                        setMode(ToolMode.EDIT);
+                } else if (currentMode == ToolMode.SELECT && hasSelection(selectionRect)) {
+                    // Check that rect has area
+                    int minX = Math.min(Math.min(selectionRect[0].x, selectionRect[1].x),
+                                       Math.min(selectionRect[2].x, selectionRect[3].x));
+                    int maxX = Math.max(Math.max(selectionRect[0].x, selectionRect[1].x),
+                                       Math.max(selectionRect[2].x, selectionRect[3].x));
+                    int minY = Math.min(Math.min(selectionRect[0].y, selectionRect[1].y),
+                                       Math.min(selectionRect[2].y, selectionRect[3].y));
+                    int maxY = Math.max(Math.max(selectionRect[0].y, selectionRect[1].y),
+                                       Math.max(selectionRect[2].y, selectionRect[3].y));
+
+                    Rectangle selArea = new Rectangle(minX, minY, maxX - minX, maxY - minY);
+                    for (Shape s : shapes) {
+                        s.selected = s.isFullyInside(selArea, offsetX, offsetY);
                     }
+                    setMode(ToolMode.EDIT);
                 } else if (currentMode == ToolMode.ROTATE) {
                     finishRotation();
+                } else if (currentMode == ToolMode.SCALE) {
+                    finishScale();
                 }
                 repaint();
             }
@@ -288,7 +296,6 @@ class CanvasPanel extends JPanel {
                 int worldY = e.getY() - offsetY;
 
                 if (currentMode == ToolMode.DRAW_POLYGON) {
-                    //especial handling for polygon mode to allow multiple clicks and closing the shape by clicking near the first vertex
                     if (previewShape == null) {
                         previewShape = new Point2D(worldX, worldY);
                         closeHintPoint = new Point(worldX, worldY);
@@ -329,7 +336,7 @@ class CanvasPanel extends JPanel {
                     case DRAW_POINT:
                         previewShape = new Point2D(worldX, worldY);
                         break;
-                    default: //never reached
+                    default:
                         break;
                 }
             }
@@ -341,7 +348,6 @@ class CanvasPanel extends JPanel {
         addKeyListener(new KeyAdapter() {
             @Override
             public void keyPressed(KeyEvent e) {
-                // 'V' to finalize polygon, 'X' to cancel drawing or delete selection
                 if (currentMode == ToolMode.DRAW_POLYGON && e.getKeyCode() == KeyEvent.VK_V) {
                     if (previewShape != null && previewShape.isPolygon()) {
                         Polygon2D tmp = (Polygon2D) previewShape;
@@ -360,7 +366,7 @@ class CanvasPanel extends JPanel {
                                 shapes.remove(i);
                             }
                         }
-                        selectionRect = null;
+                        clearSelectionRect(selectionRect);
                         currentMode = ToolMode.SELECT;
                     }
                     repaint();
@@ -371,15 +377,14 @@ class CanvasPanel extends JPanel {
 
     // ---- Rotation helpers ----
     private void startRotation() {
-        rotationCenter = getCenterSelected();
-        if (rotationCenter == null)
-            return;
+        transformCenter = getCenterSelected();
+        if (transformCenter == null) return;
 
-        startAngle = Math.atan2(startY - rotationCenter.y + offsetY, startX - rotationCenter.x + offsetX);
+        startAngle = Math.atan2(startY - transformCenter.y + offsetY, startX - transformCenter.x + offsetX);
         originalRectPoints.clear();
         tempShapes.clear();
         originalShapes.clear();
-        totalRotationAngle = 0.0;
+        totalTransformAngle = 0.0;
 
         for (int i = 0; i < shapes.size(); i++) {
             Shape s = shapes.get(i);
@@ -390,12 +395,8 @@ class CanvasPanel extends JPanel {
             }
         }
 
-        if (rotatedRect[0] != null) {
-            for (int i = 0; i < 4; i++) {
-                originalRectPoints.add(new Point(rotatedRect[i].x, rotatedRect[i].y));
-            }
-        } else if (selectionRect != null) {
-            originalRectPoints.addAll(getRectCorners(selectionRect));
+        for (int i = 0; i < 4; i++) {
+            originalRectPoints.add(new Point(selectionRect[i].x, selectionRect[i].y));
         }
 
         for (Shape s : shapes) {
@@ -406,21 +407,161 @@ class CanvasPanel extends JPanel {
     }
 
     private void finishRotation() {
-        if (rotationCenter != null && !originalShapes.isEmpty()) {
+        if (transformCenter != null && !originalShapes.isEmpty()) {
             for (Shape orig : originalShapes) {
                 Shape rotated = orig.clone();
-                rotated.rotate(rotationCenter, totalRotationAngle);
+                rotated.rotate(transformCenter, totalTransformAngle);
                 shapes.add(rotated);
             }
         }
-        rotationCenter = null;
+        rotationAngle = normalizeAngle(rotationAngle + totalTransformAngle);
+        transformCenter = null;
         originalShapes.clear();
         tempShapes.clear();
         originalRectPoints.clear();
-        totalRotationAngle = 0.0;
+        totalTransformAngle = 0.0;
         setMode(ToolMode.EDIT);
         if (listener != null)
             listener.updateToolButtons();
+    }
+
+    public void rotate(double angle) {
+        if (transformCenter == null) return;
+
+        tempShapes.clear();
+        for (Shape orig : originalShapes) {
+            Shape temp = orig.clone();
+            temp.rotate(transformCenter, angle);
+            tempShapes.add(temp);
+        }
+
+        for (int i = 0; i < 4; i++) {
+            Point orig = originalRectPoints.get(i);
+            selectionRect[i] = Shape.rotatePoint(orig.x, orig.y, transformCenter, angle);
+        }
+        repaint();
+    }
+
+    // ---- Scale helpers ----
+    private void startScale() {
+        scaleCenter = getCenterSelected();
+        if (scaleCenter == null) return;
+
+        originalRectPoints.clear();
+        tempShapes.clear();
+        originalShapes.clear();
+        startScaleDistance = Math.hypot(startX - scaleCenter.x, startY - scaleCenter.y);
+
+        for (int i = 0; i < shapes.size(); i++) {
+            Shape s = shapes.get(i);
+            if (s.selected) {
+                originalShapes.add(s.clone());
+                shapes.remove(i);
+                i--;
+            }
+        }
+
+        for (int i = 0; i < 4; i++) {
+            originalRectPoints.add(new Point(selectionRect[i].x, selectionRect[i].y));
+        }
+
+        for (Shape s : shapes) {
+            if (s.selected) {
+                tempShapes.add(s);
+            }
+        }
+    }
+
+    public void scale(double scaleX, double scaleY) {
+        if (scaleCenter == null) return;
+
+        tempShapes.clear();
+        for (Shape orig : originalShapes) {
+            Shape temp = orig.clone();
+            temp.scale(scaleCenter, scaleX, scaleY);
+            tempShapes.add(temp);
+        }
+
+        for (int i = 0; i < 4; i++) {
+            Point orig = originalRectPoints.get(i);
+            selectionRect[i] = new Point(
+                scaleCenter.x + (int) ((orig.x - scaleCenter.x) * scaleX),
+                scaleCenter.y + (int) ((orig.y - scaleCenter.y) * scaleY));
+        }
+        repaint();
+    }
+
+    private void finishScale() {
+        if (scaleCenter != null && !originalShapes.isEmpty() && !originalRectPoints.isEmpty()) {
+            // Compute final scale factor from current selectionRect vs original
+            double dx = selectionRect[1].x - scaleCenter.x;
+            double dy = selectionRect[1].y - scaleCenter.y;
+            double currDist = Math.hypot(dx, dy);
+            double origDx = originalRectPoints.get(1).x - scaleCenter.x;
+            double origDy = originalRectPoints.get(1).y - scaleCenter.y;
+            double origDist = Math.hypot(origDx, origDy);
+            double finalScale = origDist > 0 ? currDist / origDist : 1.0;
+
+            for (Shape orig : originalShapes) {
+                Shape scaled = orig.clone();
+                scaled.scale(scaleCenter, finalScale, finalScale);
+                shapes.add(scaled);
+            }
+        }
+        scaleCenter = null;
+        originalShapes.clear();
+        tempShapes.clear();
+        originalRectPoints.clear();
+        setMode(ToolMode.EDIT);
+        if (listener != null)
+            listener.updateToolButtons();
+    }
+
+    // ---- Reflection helpers ----
+    public void reflectX() {
+        applyReflection(-1, 1);
+    }
+
+    public void reflectY() {
+        applyReflection(1, -1);
+    }
+
+    public void reflectXY() {
+        applyReflection(-1, -1);
+    }
+
+    private void applyReflection(double scaleX, double scaleY) {
+        if (!hasSelection(selectionRect)) return;
+        Point center = getCenterSelected();
+        if (center == null) return;
+
+        // Reflect about the shape's local axes: unrotate > reflect > re-rotate
+        double ra = rotationAngle;
+        for (Shape s : shapes) {
+            if (s.selected) {
+                s.rotate(center, -ra);
+                s.scale(center, scaleX, scaleY);
+                s.rotate(center, ra);
+            }
+        }
+        for (Shape s : tempShapes) {
+            if (s.selected) {
+                s.rotate(center, -ra);
+                s.scale(center, scaleX, scaleY);
+                s.rotate(center, ra);
+            }
+        }
+
+        // Update selection rect corners the same way
+        Point[] oldCorners = clonePoints(selectionRect);
+        for (int i = 0; i < 4; i++) {
+            oldCorners[i] = Shape.rotatePoint(oldCorners[i].x, oldCorners[i].y, center, -ra);
+            oldCorners[i].x = center.x + (int) ((oldCorners[i].x - center.x) * scaleX);
+            oldCorners[i].y = center.y + (int) ((oldCorners[i].y - center.y) * scaleY);
+            selectionRect[i] = Shape.rotatePoint(oldCorners[i].x, oldCorners[i].y, center, ra);
+        }
+
+        repaint();
     }
 
     // ---- Paint ----
@@ -434,8 +575,8 @@ class CanvasPanel extends JPanel {
             s.draw(g2, offsetX, offsetY, false);
         }
 
-        // Draw rotated temp shapes during ROTATE mode
-        if (currentMode == ToolMode.ROTATE && !tempShapes.isEmpty()) {
+        // Draw transformed temp shapes during ROTATE/SCALE mode
+        if ((currentMode == ToolMode.ROTATE || currentMode == ToolMode.SCALE) && !tempShapes.isEmpty()) {
             for (Shape s : tempShapes) {
                 s.draw(g2, offsetX, offsetY, false);
             }
@@ -460,24 +601,20 @@ class CanvasPanel extends JPanel {
             g2.setStroke(new BasicStroke(1));
         }
 
-        // Draw selection rectangle
-        if (selectionRect != null) {
+        // Draw selection rect
+        if (hasSelection(selectionRect)) {
             g2.setColor(Color.BLACK);
             g2.setStroke(new BasicStroke(3f));
             if (currentMode != ToolMode.EDIT) {
                 float[] dash = {8f, 4f};
                 g2.setStroke(new BasicStroke(3f, BasicStroke.CAP_BUTT, BasicStroke.JOIN_MITER, 10f, dash, 0f));
             }
-            if (rotatedRect[0] != null) {
-                Polygon poly = new Polygon();
-                Point[] pts = buildRotatedPolygon(rotatedRect, offsetX, offsetY);
-                for (Point p : pts) {
-                    poly.addPoint(p.x, p.y);
-                }
-                g2.draw(poly);
-            } else {
-                g2.draw(selectionRect);
+            Polygon poly = new Polygon();
+            Point[] pts = buildSelectionPolygon(selectionRect, offsetX, offsetY);
+            for (Point p : pts) {
+                poly.addPoint(p.x, p.y);
             }
+            g2.draw(poly);
         }
     }
 }

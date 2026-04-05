@@ -1,7 +1,10 @@
 import java.awt.*;
-import java.util.List;
 import java.util.ArrayList;
-import static java.lang.Math.*;
+import java.util.List;
+
+import static java.lang.Math.cos;
+import static java.lang.Math.round;
+import static java.lang.Math.sin;
 
 enum ToolMode {
     DRAW_POINT,
@@ -25,18 +28,23 @@ abstract class Shape {
 
     abstract void rotate(Point center, double angle);
 
-    abstract void scale(double sx, double sy, Point center);
+    public abstract Shape clone();
 
-    abstract void reflectX(Point center);
+    boolean isPolygon() {
+        return false;
+    }
 
-    abstract void reflectY(Point center);
+    boolean isPoint() {
+        return false;
+    }
 
-    abstract boolean isPolygon();
-
-    abstract boolean isPoint();
-
-    public Shape clone() {
-        throw new UnsupportedOperationException("Must override clone in subclasses");
+    static Point rotatePoint(int px, int py, Point center, double angle) {
+        double dx = px - center.x;
+        double dy = py - center.y;
+        return new Point(
+                (int) round(center.x + dx * cos(angle) - dy * sin(angle)),
+                (int) round(center.y + dx * sin(angle) + dy * cos(angle))
+        );
     }
 }
 
@@ -48,7 +56,7 @@ class Point2D extends Shape {
         this.y = y;
     }
 
-    public Point2D(int x, int y, boolean selected) {
+    private Point2D(int x, int y, boolean selected) {
         this(x, y);
         this.selected = selected;
     }
@@ -58,7 +66,6 @@ class Point2D extends Shape {
         Graphics2D g2 = (Graphics2D) g;
         Utils.prepareShapeGraphics(g2, selected, highlight);
         g2.fillOval(x + offsetX - 4, y + offsetY - 4, 6, 6);
-        Utils.resetStroke(g2);
     }
 
     @Override
@@ -74,47 +81,23 @@ class Point2D extends Shape {
 
     @Override
     public void rotate(Point center, double angle) {
-        double dx = x - center.x;
-        double dy = y - center.y;
-        x = (int) Math.round(center.x + dx * cos(angle) - dy * sin(angle));
-        y = (int) Math.round(center.y + dx * sin(angle) + dy * cos(angle));
-    }
-
-    @Override
-    public void scale(double sx, double sy, Point center) {
-        int dx = x - center.x;
-        int dy = y - center.y;
-        x = center.x + (int) (dx * sx);
-        y = center.y + (int) (dy * sy);
-    }
-
-    @Override
-    public void reflectX(Point center) {
-        y = center.y - (y - center.y);
-    }
-
-    @Override
-    public void reflectY(Point center) {
-        x = center.x - (x - center.x);
-    }
-
-    public boolean contains(int mx, int my, int offsetX, int offsetY) {
-        return hypot(mx - (x + offsetX), my - (y + offsetY)) <= 6;
-    }
-
-    @Override
-    public boolean isPolygon() {
-        return false;
-    }
-
-    @Override
-    public boolean isPoint() {
-        return true;
+        Point rotated = Shape.rotatePoint(x, y, center, angle);
+        x = rotated.x;
+        y = rotated.y;
     }
 
     @Override
     public Point2D clone() {
         return new Point2D(x, y, selected);
+    }
+
+    boolean contains(int mx, int my, int offsetX, int offsetY) {
+        return java.lang.Math.hypot(mx - (x + offsetX), my - (y + offsetY)) <= 6;
+    }
+
+    @Override
+    boolean isPoint() {
+        return true;
     }
 }
 
@@ -128,7 +111,7 @@ class Line2D extends Shape {
         this.y2 = y2;
     }
 
-    public Line2D(int x1, int y1, int x2, int y2, boolean selected) {
+    Line2D(int x1, int y1, int x2, int y2, boolean selected) {
         this(x1, y1, x2, y2);
         this.selected = selected;
     }
@@ -138,7 +121,6 @@ class Line2D extends Shape {
         Graphics2D g2 = (Graphics2D) g;
         Utils.prepareShapeGraphics(g2, selected, highlight);
         g2.drawLine(x1 + offsetX, y1 + offsetY, x2 + offsetX, y2 + offsetY);
-        Utils.resetStroke(g2);
     }
 
     @Override
@@ -156,48 +138,10 @@ class Line2D extends Shape {
 
     @Override
     public void rotate(Point center, double angle) {
-        double dx1 = x1 - center.x;
-        double dy1 = y1 - center.y;
-        x1 = (int) Math.round(center.x + dx1 * cos(angle) - dy1 * sin(angle));
-        y1 = (int) Math.round(center.y + dx1 * sin(angle) + dy1 * cos(angle));
-        double dx2 = x2 - center.x;
-        double dy2 = y2 - center.y;
-        x2 = (int) Math.round(center.x + dx2 * cos(angle) - dy2 * sin(angle));
-        y2 = (int) Math.round(center.y + dx2 * sin(angle) + dy2 * cos(angle));
-    }
-
-    @Override
-    public void scale(double sx, double sy, Point center) {
-        int dx1 = x1 - center.x;
-        int dy1 = y1 - center.y;
-        x1 = center.x + (int) (dx1 * sx);
-        y1 = center.y + (int) (dy1 * sy);
-        int dx2 = x2 - center.x;
-        int dy2 = y2 - center.y;
-        x2 = center.x + (int) (dx2 * sx);
-        y2 = center.y + (int) (dy2 * sy);
-    }
-
-    @Override
-    public void reflectX(Point center) {
-        y1 = center.y - (y1 - center.y);
-        y2 = center.y - (y2 - center.y);
-    }
-
-    @Override
-    public void reflectY(Point center) {
-        x1 = center.x - (x1 - center.x);
-        x2 = center.x - (x2 - center.x);
-    }
-
-    @Override
-    public boolean isPolygon() {
-        return false;
-    }
-
-    @Override
-    public boolean isPoint() {
-        return false;
+        Point p1 = Shape.rotatePoint(x1, y1, center, angle);
+        Point p2 = Shape.rotatePoint(x2, y2, center, angle);
+        x1 = p1.x; y1 = p1.y;
+        x2 = p2.x; y2 = p2.y;
     }
 
     @Override
@@ -215,10 +159,8 @@ class Circle2D extends Shape {
         this.radius = radius;
     }
 
-    public Circle2D(int cx, int cy, int radius, boolean selected) {
-        this.cx = cx;
-        this.cy = cy;
-        this.radius = radius;
+    Circle2D(int cx, int cy, int radius, boolean selected) {
+        this(cx, cy, radius);
         this.selected = selected;
     }
 
@@ -227,7 +169,6 @@ class Circle2D extends Shape {
         Graphics2D g2 = (Graphics2D) g;
         Utils.prepareShapeGraphics(g2, selected, highlight);
         g2.drawOval(cx + offsetX - radius, cy + offsetY - radius, 2 * radius, 2 * radius);
-        Utils.resetStroke(g2);
     }
 
     @Override
@@ -249,40 +190,9 @@ class Circle2D extends Shape {
 
     @Override
     public void rotate(Point center, double angle) {
-        double dx = cx - center.x;
-        double dy = cy - center.y;
-        cx = (int) Math.round(center.x + dx * cos(angle) - dy * sin(angle));
-        cy = (int) Math.round(center.y + dx * sin(angle) + dy * cos(angle));
-    }
-
-    @Override
-    public void scale(double sx, double sy, Point center) {
-        double factor = (sx + sy) / 2;
-        int dx = cx - center.x;
-        int dy = cy - center.y;
-        cx = center.x + (int) (dx * sx);
-        cy = center.y + (int) (dy * sy);
-        radius = Math.max(1, (int) (radius * factor));
-    }
-
-    @Override
-    public void reflectX(Point center) {
-        cy = center.y - (cy - center.y);
-    }
-
-    @Override
-    public void reflectY(Point center) {
-        cx = center.x - (cx - center.x);
-    }
-
-    @Override
-    public boolean isPolygon() {
-        return false;
-    }
-
-    @Override
-    public boolean isPoint() {
-        return false;
+        Point rotated = Shape.rotatePoint(cx, cy, center, angle);
+        cx = rotated.x;
+        cy = rotated.y;
     }
 
     @Override
@@ -294,16 +204,16 @@ class Circle2D extends Shape {
 class Polygon2D extends Shape {
     ArrayList<Point2D> vertices;
 
-    public Polygon2D(List<Point2D> verts) {
+    Polygon2D(List<Point2D> verts) {
         vertices = new ArrayList<>(verts);
     }
 
-    public Polygon2D(List<Point2D> verts, boolean selected) {
+    Polygon2D(List<Point2D> verts, boolean selected) {
         vertices = new ArrayList<>(verts);
         this.selected = selected;
     }
 
-    public void add(int x, int y) {
+    void add(int x, int y) {
         vertices.add(new Point2D(x, y));
     }
 
@@ -316,7 +226,6 @@ class Polygon2D extends Shape {
             poly.addPoint(v.x + offsetX, v.y + offsetY);
         }
         g2.drawPolyline(poly.xpoints, poly.ypoints, vertices.size());
-        Utils.resetStroke(g2);
     }
 
     @Override
@@ -342,39 +251,16 @@ class Polygon2D extends Shape {
     }
 
     @Override
-    public void scale(double sx, double sy, Point center) {
-        for (Point2D v : vertices)
-            v.scale(sx, sy, center);
-    }
-
-    @Override
-    public void reflectX(Point center) {
-        for (Point2D v : vertices)
-            v.reflectX(center);
-    }
-
-    @Override
-    public void reflectY(Point center) {
-        for (Point2D v : vertices)
-            v.reflectY(center);
-    }
-
-    @Override
-    public boolean isPolygon() {
-        return true;
-    }
-
-    @Override
-    public boolean isPoint() {
-        return false;
-    }
-
-    @Override
     public Polygon2D clone() {
         ArrayList<Point2D> clonedVerts = new ArrayList<>();
         for (Point2D v : vertices) {
             clonedVerts.add(v.clone());
         }
         return new Polygon2D(clonedVerts, selected);
+    }
+
+    @Override
+    boolean isPolygon() {
+        return true;
     }
 }

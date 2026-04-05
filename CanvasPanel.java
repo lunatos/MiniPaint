@@ -288,6 +288,7 @@ class CanvasPanel extends JPanel {
                 int worldY = e.getY() - offsetY;
 
                 if (currentMode == ToolMode.DRAW_POLYGON) {
+                    //especial handling for polygon mode to allow multiple clicks and closing the shape by clicking near the first vertex
                     if (previewShape == null) {
                         previewShape = new Point2D(worldX, worldY);
                         closeHintPoint = new Point(worldX, worldY);
@@ -328,6 +329,8 @@ class CanvasPanel extends JPanel {
                     case DRAW_POINT:
                         previewShape = new Point2D(worldX, worldY);
                         break;
+                    default: //never reached
+                        break;
                 }
             }
         };
@@ -338,6 +341,7 @@ class CanvasPanel extends JPanel {
         addKeyListener(new KeyAdapter() {
             @Override
             public void keyPressed(KeyEvent e) {
+                // 'V' to finalize polygon, 'X' to cancel drawing or delete selection
                 if (currentMode == ToolMode.DRAW_POLYGON && e.getKeyCode() == KeyEvent.VK_V) {
                     if (previewShape != null && previewShape.isPolygon()) {
                         Polygon2D tmp = (Polygon2D) previewShape;

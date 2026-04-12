@@ -12,6 +12,8 @@ public class PaintApp implements CanvasListener {
     private JButton reflectXBtn, reflectYBtn, reflectXYBtn;
     private boolean useDDAMode = true;
     private JButton rasterizeBtn;
+    private boolean useLiangBarskyMode = false;
+    private JButton clipBtn;
 
     private static Font loadFont(float size) {
         try (java.io.InputStream is = PaintApp.class.getResourceAsStream("/fonts/fa-solid-900.otf")) {
@@ -31,7 +33,7 @@ public class PaintApp implements CanvasListener {
     private void init() {
         frame = new JFrame("Mini Paint - Computação Gráfica");
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        frame.setSize(800, 600);
+        frame.setSize(900, 600);
 
         canvas = new CanvasPanel(this);
 
@@ -86,6 +88,19 @@ public class PaintApp implements CanvasListener {
         });
         tools.add(rasterizeBtn);
 
+        // Clipping algorithm toggle button
+        clipBtn = new JButton("Cohen");
+        clipBtn.setFont(faFont);
+        clipBtn.setToolTipText("Toggle Clipping Algorithm: Cohen-Sutherland (click to switch to Liang-Barsky)");
+        clipBtn.addActionListener(e -> {
+            useLiangBarskyMode = !useLiangBarskyMode;
+            clipBtn.setText(useLiangBarskyMode ? "Liang" : "Cohen");
+            clipBtn.setToolTipText(useLiangBarskyMode ?
+                "Toggle Clipping Algorithm: Liang-Barsky (click to switch to Cohen-Sutherland)" :
+                "Toggle Clipping Algorithm: Cohen-Sutherland (click to switch to Liang-Barsky)");
+        });
+        tools.add(clipBtn);
+
         frame.setLayout(new BorderLayout());
         frame.add(canvas, BorderLayout.CENTER);
         frame.add(tools, BorderLayout.NORTH);
@@ -119,6 +134,10 @@ public class PaintApp implements CanvasListener {
 
     public boolean isUseDDAMode() {
         return useDDAMode;
+    }
+
+    public boolean isUseLiangBarskyMode() {
+        return useLiangBarskyMode;
     }
 
     public static void main(String[] args) {

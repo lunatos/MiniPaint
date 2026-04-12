@@ -21,7 +21,8 @@ enum ToolMode {
 abstract class Shape {
     boolean selected = false;
 
-abstract void draw(Graphics g, int offsetX, int offsetY, boolean highlight, PaintApp app, int vLeft, int vTop, int vRight, int vBottom);
+    abstract void draw(Graphics g, int offsetX, int offsetY, boolean highlight, PaintApp app, int vLeft, int vTop,
+            int vRight, int vBottom);
 
     abstract boolean isFullyInside(Rectangle rect, int offsetX, int offsetY);
 
@@ -63,13 +64,13 @@ class Point2D extends Shape {
         this.selected = selected;
     }
 
-@Override
-    public void draw(Graphics g, int offsetX, int offsetY, boolean highlight, PaintApp app, int vLeft, int vTop, int vRight, int vBottom) {
+    @Override
+    public void draw(Graphics g, int offsetX, int offsetY, boolean highlight, PaintApp app, int vLeft, int vTop,
+            int vRight, int vBottom) {
         Graphics2D g2 = (Graphics2D) g;
         Utils.prepareShapeGraphics(g2, selected, highlight);
         g2.fillOval(x + offsetX - 4, y + offsetY - 4, 6, 6);
     }
-
 
     @Override
     public boolean isFullyInside(Rectangle rect, int offsetX, int offsetY) {
@@ -125,16 +126,23 @@ class Line2D extends Shape {
         this.selected = selected;
     }
 
-@Override
-    public void draw(Graphics g, int offsetX, int offsetY, boolean highlight, PaintApp app, int vLeft, int vTop, int vRight, int vBottom) {
+    @Override
+    public void draw(Graphics g, int offsetX, int offsetY, boolean highlight, PaintApp app, int vLeft, int vTop,
+            int vRight, int vBottom) {
         Graphics2D g2 = (Graphics2D) g;
         Utils.prepareShapeGraphics(g2, selected, highlight);
         boolean useDDA = (app != null && app.isUseDDAMode());
-        double[] p1 = {x1, y1};
-        double[] p2 = {x2, y2};
-        if (cohenSutherlandClip(p1, p2, vLeft, vTop, vRight, vBottom)) {
-            int sx1 = (int)p1[0] + offsetX, sy1 = (int)p1[1] + offsetY;
-            int sx2 = (int)p2[0] + offsetX, sy2 = (int)p2[1] + offsetY;
+        double[] p1 = { x1, y1 };
+        double[] p2 = { x2, y2 };
+        boolean clipped;
+        if (app != null && app.isUseLiangBarskyMode()) {
+            clipped = liangBarsky(p1, p2, vLeft, vTop, vRight, vBottom);
+        } else {
+            clipped = cohenSutherlandClip(p1, p2, vLeft, vTop, vRight, vBottom);
+        }
+        if (clipped) {
+            int sx1 = (int) p1[0] + offsetX, sy1 = (int) p1[1] + offsetY;
+            int sx2 = (int) p2[0] + offsetX, sy2 = (int) p2[1] + offsetY;
             if (useDDA) {
                 drawLineDDA(g2, sx1, sy1, sx2, sy2);
             } else {
@@ -174,12 +182,55 @@ class Line2D extends Shape {
         y2 = center.y + (int) ((y2 - center.y) * scaleY);
     }
 
+    private boolean cliptest (float p, float q, double[] u1, double[] u2) {
+        double r = q / p;
+        if (p < 0) { // potential entering
+            if (r > u2[0]) return false;
+            if (r > u1[0]) u1[0] = r;
+        } else if (p > 0) { // potential leaving
+            if (r < u1[0]) return false;
+            if (r < u2[0]) u2[0] = r;
+        } else if (q < 0) { // parallel and outside
+            return false;
+        }
+        return true;
+    }
+
+    private boolean liangBarsky(double[] p1, double[] p2, int vLeft, int vTop, int vRight, int vBottom) {
+        float x1 = ((float)p1[0]), y1 = ((float)p1[1]);
+        float x2 = ((float)p2[0]), y2 = ((float)p2[1]);
+        float dx = x2 - x1;
+        float dy = y2 - y1;
+        double u1 = 0.0;
+        double u2 = 1.0;
+
+        if (cliptest(-dx, x1 - vLeft, new double[]{u1}, new double[]{u2}) &&
+            cliptest(dx, vRight - x1, new double[]{u1}, new double[]{u2}) &&
+            cliptest(-dy, y1 - vTop, new double[]{u1}, new double[]{u2}) &&
+            cliptest(dy, vBottom - y1, new double[]{u1}, new double[]{u2})) {
+            if (u2 < 1.0) {
+                p2[0] = x1 + u2 * dx;
+                p2[1] = y1 + u2 * dy;
+            }
+            if (u1 > 0.0) {
+                p1[0] = x1 + u1 * dx;
+                p1[1] = y1 + u1 * dy;
+            }
+            return true;
+        }
+        return false;
+    }
+
     private int computeOutcode(double x, double y, int vLeft, int vTop, int vRight, int vBottom) {
         int code = 0;
-        if (x < vLeft) code |= 1;           // LEFT
-        else if (x > vRight) code |= 2;     // RIGHT
-        if (y < vTop) code |= 4;            // TOP
-        else if (y > vBottom) code |= 8;    // BOTTOM
+        if (x < vLeft)
+            code |= 1; // LEFT
+        else if (x > vRight)
+            code |= 2; // RIGHT
+        if (y < vTop)
+            code |= 4; // TOP
+        else if (y > vBottom)
+            code |= 8; // BOTTOM
         return code;
     }
 
@@ -268,22 +319,24 @@ class Line2D extends Shape {
         int prevY = y1;
         int c1, c2, p, xincr, yincr;
 
-        if(dx >= 0) xincr = 1;
+        if (dx >= 0)
+            xincr = 1;
         else {
             xincr = -1;
             dx = -dx;
         }
-        if(dy >= 0) yincr = 1;
+        if (dy >= 0)
+            yincr = 1;
         else {
             yincr = -1;
             dy = -dy;
         }
-        if(dx > dy) {
+        if (dx > dy) {
             c1 = 2 * dy;
             c2 = 2 * (dy - dx);
             p = c1 - dx;
-            for(int i = 0; i <= dx; i++) {
-                if(p < 0) {
+            for (int i = 0; i <= dx; i++) {
+                if (p < 0) {
                     p += c1;
                 } else {
                     g2.drawLine(prevX, prevY, x, y);
@@ -298,8 +351,8 @@ class Line2D extends Shape {
             c1 = 2 * dx;
             c2 = 2 * (dx - dy);
             p = c1 - dy;
-            for(int i = 0; i <= dy; i++) {
-                if(p < 0) {
+            for (int i = 0; i <= dy; i++) {
+                if (p < 0) {
                     p += c1;
                 } else {
                     g2.drawLine(prevX, prevY, x, y);
@@ -328,8 +381,9 @@ class Circle2D extends Shape {
         this.selected = selected;
     }
 
-@Override
-    public void draw(Graphics g, int offsetX, int offsetY, boolean highlight, PaintApp app, int vLeft, int vTop, int vRight, int vBottom) {
+    @Override
+    public void draw(Graphics g, int offsetX, int offsetY, boolean highlight, PaintApp app, int vLeft, int vTop,
+            int vRight, int vBottom) {
         Graphics2D g2 = (Graphics2D) g;
         Utils.prepareShapeGraphics(g2, selected, highlight);
         if (app != null) {
@@ -349,7 +403,6 @@ class Circle2D extends Shape {
                 left >= rect.x && right <= rect.x + rect.width &&
                 top >= rect.y && bottom <= rect.y + rect.height;
     }
-
 
     @Override
     public void translate(int dx, int dy) {
@@ -420,8 +473,9 @@ class Polygon2D extends Shape {
         vertices.add(new Point2D(x, y));
     }
 
-@Override
-    public void draw(Graphics g, int offsetX, int offsetY, boolean highlight, PaintApp app, int vLeft, int vTop, int vRight, int vBottom) {
+    @Override
+    public void draw(Graphics g, int offsetX, int offsetY, boolean highlight, PaintApp app, int vLeft, int vTop,
+            int vRight, int vBottom) {
         Graphics2D g2 = (Graphics2D) g;
         Utils.prepareShapeGraphics(g2, selected, highlight);
 
@@ -436,7 +490,6 @@ class Polygon2D extends Shape {
             tmp.draw(g, offsetX, offsetY, highlight, app, vLeft, vTop, vRight, vBottom);
         }
     }
-
 
     @Override
     public boolean isFullyInside(Rectangle rect, int offsetX, int offsetY) {

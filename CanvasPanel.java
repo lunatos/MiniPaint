@@ -41,6 +41,7 @@ class CanvasPanel extends JPanel {
 
     // pan/transform
     private int offsetX = 0, offsetY = 0;
+    private int startWorldX, startWorldY;
 
     // mouse drag state
     private boolean drag = false;
@@ -146,10 +147,10 @@ class CanvasPanel extends JPanel {
     }
 
     // ---- Drawing helpers ----
-    private static Point[] buildSelectionPolygon(Point[] rect, int offX, int offY) {
+    private static Point[] buildSelectionPolygon(Point[] rect) {
         Point[] pts = new Point[4];
         for (int i = 0; i < 4; i++) {
-            pts[i] = new Point(rect[i].x + offX, rect[i].y + offY);
+            pts[i] = new Point(rect[i].x, rect[i].y);
         }
         return pts;
     }
@@ -165,6 +166,8 @@ class CanvasPanel extends JPanel {
             public void mousePressed(MouseEvent e) {
                 startX = e.getX();
                 startY = e.getY();
+                startWorldX = startX - offsetX;
+                startWorldY = startY - offsetY;
                 lastX = startX;
                 lastY = startY;
 
@@ -174,24 +177,20 @@ class CanvasPanel extends JPanel {
                         for (int i = 0; i < 4; i++) {
                             poly.addPoint(selectionRect[i].x, selectionRect[i].y);
                         }
-                        if (poly.contains(startX, startY)) {
+                        if (poly.contains(startWorldX, startWorldY)) {
                             drag = true;
                             return;
                         }
                     }
                     restartSelection();
                     return;
-
                 } else if (currentMode == ToolMode.SELECT) {
                     clearSelection();
                     drag = false;
-
                 } else if (currentMode == ToolMode.ROTATE) {
                     startRotation();
-
                 } else if (currentMode == ToolMode.SCALE) {
                     startScale();
-
                 } else if (isDrawMode()) {
                     handleDrawPress(e);
                 }
@@ -207,7 +206,9 @@ class CanvasPanel extends JPanel {
                     offsetX += x - lastX;
                     offsetY += y - lastY;
                 } else if (currentMode == ToolMode.SELECT) {
-                    setSelectionRectFromDrag(selectionRect, startX, startY, x, y);
+                    int worldX = x - offsetX;
+                    int worldY = y - offsetY;
+                    setSelectionRectFromDrag(selectionRect, startWorldX, startWorldY, worldX, worldY);
                 } else if (currentMode == ToolMode.EDIT && drag) {
                     translate(x - lastX, y - lastY);
                 } else if (currentMode == ToolMode.ROTATE && transformCenter != null) {
@@ -239,14 +240,18 @@ class CanvasPanel extends JPanel {
                 int worldY = y - offsetY;
                 if (currentMode == ToolMode.DRAW_POLYGON && previewShape != null) {
                     if (previewShape.isPolygon()) {
+                        // Close Hint logic: if cursor is within tolerance of first vertex, show hint to close polygon
                         Polygon2D poly = (Polygon2D) previewShape;
                         if (!poly.vertices.isEmpty()) {
                             Point2D lastVertex = poly.vertices.get(poly.vertices.size() - 1);
                             polygonPreviewLine = new Line2D(lastVertex.x, lastVertex.y, worldX, worldY);
                         }
-                        showCloseHint = poly.vertices.size() >= 3
-                                && java.lang.Math.hypot(worldX - closeHintPoint.x, worldY - closeHintPoint.y) < POLYGON_CLOSE_TOLERANCE;
+                        if (poly.vertices.size() >= 3) {
+                            Point2D first = poly.vertices.get(0);
+                            showCloseHint = java.lang.Math.hypot(worldX - first.x, worldY - first.y) < POLYGON_CLOSE_TOLERANCE;
+                        }
                     } else if (previewShape.isPoint()) {
+                        // First vertex added, now dragging to second vertex. Convert previewShape to Polygon2D and show line to current cursor.
                         Point2D firstVertex = (Point2D) previewShape;
                         ArrayList<Point2D> verts = new ArrayList<>();
                         verts.add(firstVertex);
@@ -268,16 +273,17 @@ class CanvasPanel extends JPanel {
                         shapes.add(previewShape);
                     }
                 } else if (currentMode == ToolMode.SELECT && hasSelection(selectionRect)) {
-                    // Check that rect has area
-                    int minX = Math.min(Math.min(selectionRect[0].x, selectionRect[1].x),
-                                       Math.min(selectionRect[2].x, selectionRect[3].x));
-                    int maxX = Math.max(Math.max(selectionRect[0].x, selectionRect[1].x),
-                                       Math.max(selectionRect[2].x, selectionRect[3].x));
-                    int minY = Math.min(Math.min(selectionRect[0].y, selectionRect[1].y),
-                                       Math.min(selectionRect[2].y, selectionRect[3].y));
-                    int maxY = Math.max(Math.max(selectionRect[0].y, selectionRect[1].y),
-                                       Math.max(selectionRect[2].y, selectionRect[3].y));
-
+                    // Compute screen rect from world selectionRect
+                    int minX = Integer.MAX_VALUE, minY = Integer.MAX_VALUE;
+                    int maxX = Integer.MIN_VALUE, maxY = Integer.MIN_VALUE;
+                    for (int i = 0; i < 4; i++) {
+                        int sx = selectionRect[i].x + offsetX;
+                        int sy = selectionRect[i].y + offsetY;
+                        minX = Math.min(minX, sx);
+                        maxX = Math.max(maxX, sx);
+                        minY = Math.min(minY, sy);
+                        maxY = Math.max(maxY, sy);
+                    }
                     Rectangle selArea = new Rectangle(minX, minY, maxX - minX, maxY - minY);
                     for (Shape s : shapes) {
                         s.selected = s.isFullyInside(selArea, offsetX, offsetY);
@@ -565,29 +571,31 @@ class CanvasPanel extends JPanel {
     }
 
     // ---- Paint ----
-    @Override
+@Override
     protected void paintComponent(Graphics g) {
         super.paintComponent(g);
         Graphics2D g2 = (Graphics2D) g;
 
+        int vLeft = -offsetX, vTop = -offsetY, vRight = getWidth() - offsetX, vBottom = getHeight() - offsetY;
+
         // Draw all shapes
         for (Shape s : shapes) {
-            s.draw(g2, offsetX, offsetY, false);
+            s.draw(g2, offsetX, offsetY, false, listener != null ? (PaintApp) listener : null, vLeft, vTop, vRight, vBottom);
         }
 
         // Draw transformed temp shapes during ROTATE/SCALE mode
         if ((currentMode == ToolMode.ROTATE || currentMode == ToolMode.SCALE) && !tempShapes.isEmpty()) {
             for (Shape s : tempShapes) {
-                s.draw(g2, offsetX, offsetY, false);
+                s.draw(g2, offsetX, offsetY, false, listener != null ? (PaintApp) listener : null, vLeft, vTop, vRight, vBottom);
             }
         }
 
         // Draw preview shape
         if (previewShape != null) {
-            previewShape.draw(g2, offsetX, offsetY, true);
+            previewShape.draw(g2, offsetX, offsetY, true, listener != null ? (PaintApp) listener : null, vLeft, vTop, vRight, vBottom);
         }
         if (polygonPreviewLine != null) {
-            polygonPreviewLine.draw(g2, offsetX, offsetY, true);
+            polygonPreviewLine.draw(g2, offsetX, offsetY, true, listener != null ? (PaintApp) listener : null, vLeft, vTop, vRight, vBottom);
         }
 
         // Draw polygon close hint
@@ -610,11 +618,12 @@ class CanvasPanel extends JPanel {
                 g2.setStroke(new BasicStroke(3f, BasicStroke.CAP_BUTT, BasicStroke.JOIN_MITER, 10f, dash, 0f));
             }
             Polygon poly = new Polygon();
-            Point[] pts = buildSelectionPolygon(selectionRect, offsetX, offsetY);
+            Point[] pts = buildSelectionPolygon(selectionRect);
             for (Point p : pts) {
-                poly.addPoint(p.x, p.y);
+                poly.addPoint(p.x + offsetX, p.y + offsetY);
             }
             g2.draw(poly);
         }
     }
+
 }

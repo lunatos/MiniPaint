@@ -10,6 +10,8 @@ public class PaintApp implements CanvasListener {
     private final Map<ToolMode, JButton> modeButtons = new LinkedHashMap<>();
     private final Color highlightColor = new Color(173, 216, 230);
     private JButton reflectXBtn, reflectYBtn, reflectXYBtn;
+    private boolean useDDAMode = true;
+    private JButton rasterizeBtn;
 
     private static Font loadFont(float size) {
         try (java.io.InputStream is = PaintApp.class.getResourceAsStream("/fonts/fa-solid-900.otf")) {
@@ -63,12 +65,26 @@ public class PaintApp implements CanvasListener {
         reflectYBtn.setToolTipText("Reflect Y");
         reflectYBtn.addActionListener(e -> canvas.reflectY());
         tools.add(reflectYBtn);
-        
+
         reflectXYBtn = new JButton("\u0058 \u0059");
         reflectXYBtn.setFont(faFont);
         reflectXYBtn.setToolTipText("Reflect XY");
         reflectXYBtn.addActionListener(e -> canvas.reflectXY());
         tools.add(reflectXYBtn);
+
+        // Rasterization toggle button
+        tools.add(new JSeparator(JSeparator.VERTICAL));
+        rasterizeBtn = new JButton("DDA");
+        rasterizeBtn.setFont(faFont);
+        rasterizeBtn.setToolTipText("Toggle Rasterization Algorithm: DDA (click to switch to Bresenham)");
+        rasterizeBtn.addActionListener(e -> {
+            useDDAMode = !useDDAMode;
+            rasterizeBtn.setText(useDDAMode ? "DDA" : "Bres");
+            rasterizeBtn.setToolTipText(useDDAMode ?
+                "Toggle Rasterization Algorithm: DDA (click to switch to Bresenham)" :
+                "Toggle Rasterization Algorithm: Bresenham (click to switch to DDA)");
+        });
+        tools.add(rasterizeBtn);
 
         frame.setLayout(new BorderLayout());
         frame.add(canvas, BorderLayout.CENTER);
@@ -99,6 +115,10 @@ public class PaintApp implements CanvasListener {
                 : mode == btnMode;
             entry.getValue().setBackground(isActive ? highlightColor : normal);
         }
+    }
+
+    public boolean isUseDDAMode() {
+        return useDDAMode;
     }
 
     public static void main(String[] args) {

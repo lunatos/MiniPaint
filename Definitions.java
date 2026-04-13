@@ -257,19 +257,23 @@ class Line2D extends Shape {
 
             double px = 0, py = 0;
             if ((out & 8) != 0) { // BOTTOM? No: bit 8 = y > vBottom (clip to vBottom)
-                if (Math.abs(dy) < EPS) return false; // parallel to top/bottom
+                if (Math.abs(dy) < EPS)
+                    return false; // parallel to top/bottom
                 px = x1 + dx * (vBottom - y1) / dy;
                 py = vBottom;
             } else if ((out & 4) != 0) { // TOP: y < vTop -> clip vTop
-                if (Math.abs(dy) < EPS) return false;
+                if (Math.abs(dy) < EPS)
+                    return false;
                 px = x1 + dx * (vTop - y1) / dy;
                 py = vTop;
             } else if ((out & 2) != 0) { // RIGHT: x > vRight -> vRight
-                if (Math.abs(dx) < EPS) return false;
+                if (Math.abs(dx) < EPS)
+                    return false;
                 py = y1 + dy * (vRight - x1) / dx;
                 px = vRight;
             } else if ((out & 1) != 0) { // LEFT: x < vLeft -> vLeft
-                if (Math.abs(dx) < EPS) return false;
+                if (Math.abs(dx) < EPS)
+                    return false;
                 py = y1 + dy * (vLeft - x1) / dx;
                 px = vLeft;
             }
@@ -324,55 +328,35 @@ class Line2D extends Shape {
     public void drawLineBresenham(Graphics2D g2, int x1, int y1, int x2, int y2) {
         int dx = Math.abs(x2 - x1);
         int dy = Math.abs(y2 - y1);
+        int xIncr = (x2 > x1) ? 1 : -1;
+        int yIncr = (y2 > y1) ? 1 : -1;
         int x = x1;
         int y = y1;
-        int prevX = x1;
-        int prevY = y1;
-        int c1, c2, p, xincr, yincr;
-
-        if (dx >= 0)
-            xincr = 1;
-        else {
-            xincr = -1;
-            dx = -dx;
-        }
-        if (dy >= 0)
-            yincr = 1;
-        else {
-            yincr = -1;
-            dy = -dy;
-        }
-        if (dx > dy) {
-            c1 = 2 * dy;
-            c2 = 2 * (dy - dx);
-            p = c1 - dx;
-            for (int i = 0; i <= dx; i++) {
+        g2.drawLine(x, y, x, y);
+        
+        if (dx >= dy) { // linha reta suave (shallow)
+            int p = 2*dy - dx;
+            for (int i = 0; i < dx; i++) {
+                x += xIncr;
                 if (p < 0) {
-                    p += c1;
+                    p += 2*dy;
                 } else {
-                    g2.drawLine(prevX, prevY, x, y);
-                    p += c2;
-                    y += yincr;
-                    prevX = x;
-                    prevY = y;
+                    y += yIncr;
+                    p += 2*(dy - dx);
                 }
-                x += xincr;
+                g2.drawLine(x, y, x, y);
             }
-        } else {
-            c1 = 2 * dx;
-            c2 = 2 * (dx - dy);
-            p = c1 - dy;
-            for (int i = 0; i <= dy; i++) {
+        } else { // linha inclinada (steep)
+            int p = 2*dx - dy;
+            for (int i = 0; i < dy; i++) {
+                y += yIncr;
                 if (p < 0) {
-                    p += c1;
+                    p += 2*dx;
                 } else {
-                    g2.drawLine(prevX, prevY, x, y);
-                    p += c2;
-                    x += xincr;
-                    prevX = x;
-                    prevY = y;
+                    x += xIncr;
+                    p += 2*(dx - dy);
                 }
-                y += yincr;
+                g2.drawLine(x, y, x, y);
             }
         }
     }
@@ -440,8 +424,10 @@ class Circle2D extends Shape {
         return new Circle2D(cx, cy, radius, selected);
     }
 
-    private void symetricalDraw(Graphics2D g2, int cx, int cy, int offsetX, int offsetY, int x, int y, PaintApp app,int vLeft, int vTop, int vRight, int vBottom) {
-        // Draw standard 8 symmetric points with g2.drawLine for exact Bresenham circle pixels
+    private void symetricalDraw(Graphics2D g2, int cx, int cy, int offsetX, int offsetY, int x, int y, PaintApp app,
+            int vLeft, int vTop, int vRight, int vBottom) {
+        // Draw standard 8 symmetric points with g2.drawLine for exact Bresenham circle
+        // pixels
         Line2D oct1 = new Line2D(cx + x, cy + y, cx + x, cy + y, selected);
         oct1.draw(g2, offsetX, offsetY, false, app, vLeft, vTop, vRight, vBottom);
         Line2D oct2 = new Line2D(cx - x, cy + y, cx - x, cy + y, selected);
@@ -460,7 +446,8 @@ class Circle2D extends Shape {
         oct8.draw(g2, offsetX, offsetY, false, app, vLeft, vTop, vRight, vBottom);
     }
 
-    private void drawCircleBresenham(Graphics2D g2, int cx, int cy, int offsetX, int offsetY, int radius, PaintApp app, int vLeft, int vTop, int vRight, int vBottom) {
+    private void drawCircleBresenham(Graphics2D g2, int cx, int cy, int offsetX, int offsetY, int radius, PaintApp app,
+            int vLeft, int vTop, int vRight, int vBottom) {
         int x = 0;
         int y = radius;
         int p = 3 - 2 * radius;
@@ -479,6 +466,7 @@ class Circle2D extends Shape {
         }
     }
 }
+
 class Polygon2D extends Shape {
     ArrayList<Point2D> vertices;
 

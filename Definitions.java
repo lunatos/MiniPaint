@@ -239,9 +239,12 @@ class Line2D extends Shape {
 
     private boolean cohenSutherlandClip(double[] p1, double[] p2, int vLeft, int vTop, int vRight, int vBottom) {
         double x1 = p1[0], y1 = p1[1], x2 = p2[0], y2 = p2[1];
+        double dx = x2 - x1;
+        double dy = y2 - y1;
+        final double EPS = 1e-9;
+
         int out1 = computeOutcode(x1, y1, vLeft, vTop, vRight, vBottom);
         int out2 = computeOutcode(x2, y2, vLeft, vTop, vRight, vBottom);
-
         while (true) {
             if ((out1 | out2) == 0) { // Trivial accept
                 return true;
@@ -252,19 +255,26 @@ class Line2D extends Shape {
             int out = out1 != 0 ? out1 : out2;
             double x = 0, y = 0;
 
-            if ((out & 8) != 0) { // 3 TOP
-                x = x1 + (x2 - x1) * (vTop - y1) / (y2 - y1);
-                y = vTop;
-            } else if ((out & 4) != 0) { // 2 BOTTOM
-                x = x1 + (x2 - x1) * (vBottom - y1) / (y2 - y1);
-                y = vBottom;
-            } else if ((out & 2) != 0) { // 1 RIGHT
-                y = y1 + (y2 - y1) * (vRight - x1) / (x2 - x1);
-                x = vRight;
-            } else if ((out & 1) != 0) { // 0 LEFT
-                y = y1 + (y2 - y1) * (vLeft - x1) / (x2 - x1);
-                x = vLeft;
+            double px = 0, py = 0;
+            if ((out & 8) != 0) { // BOTTOM? No: bit 8 = y > vBottom (clip to vBottom)
+                if (Math.abs(dy) < EPS) return false; // parallel to top/bottom
+                px = x1 + dx * (vBottom - y1) / dy;
+                py = vBottom;
+            } else if ((out & 4) != 0) { // TOP: y < vTop -> clip vTop
+                if (Math.abs(dy) < EPS) return false;
+                px = x1 + dx * (vTop - y1) / dy;
+                py = vTop;
+            } else if ((out & 2) != 0) { // RIGHT: x > vRight -> vRight
+                if (Math.abs(dx) < EPS) return false;
+                py = y1 + dy * (vRight - x1) / dx;
+                px = vRight;
+            } else if ((out & 1) != 0) { // LEFT: x < vLeft -> vLeft
+                if (Math.abs(dx) < EPS) return false;
+                py = y1 + dy * (vLeft - x1) / dx;
+                px = vLeft;
             }
+            x = px;
+            y = py;
 
             if (out == out1) {
                 p1[0] = x;

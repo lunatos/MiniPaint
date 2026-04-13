@@ -1,7 +1,6 @@
 import java.awt.*;
 import java.util.ArrayList;
 import java.util.List;
-
 import static java.lang.Math.cos;
 import static java.lang.Math.round;
 import static java.lang.Math.sin;
@@ -182,14 +181,18 @@ class Line2D extends Shape {
         y2 = center.y + (int) ((y2 - center.y) * scaleY);
     }
 
-    private boolean cliptest (float p, float q, double[] u1, double[] u2) {
+    private boolean cliptest(float p, float q, double[] u1, double[] u2) {
         double r = q / p;
         if (p < 0) { // potential entering
-            if (r > u2[0]) return false;
-            if (r > u1[0]) u1[0] = r;
+            if (r > u2[0])
+                return false;
+            if (r > u1[0])
+                u1[0] = r;
         } else if (p > 0) { // potential leaving
-            if (r < u1[0]) return false;
-            if (r < u2[0]) u2[0] = r;
+            if (r < u1[0])
+                return false;
+            if (r < u2[0])
+                u2[0] = r;
         } else if (q < 0) { // parallel and outside
             return false;
         }
@@ -197,17 +200,17 @@ class Line2D extends Shape {
     }
 
     private boolean liangBarsky(double[] p1, double[] p2, int vLeft, int vTop, int vRight, int vBottom) {
-        float x1 = ((float)p1[0]), y1 = ((float)p1[1]);
-        float x2 = ((float)p2[0]), y2 = ((float)p2[1]);
+        float x1 = ((float) p1[0]), y1 = ((float) p1[1]);
+        float x2 = ((float) p2[0]), y2 = ((float) p2[1]);
         float dx = x2 - x1;
         float dy = y2 - y1;
         double u1 = 0.0;
         double u2 = 1.0;
 
-        if (cliptest(-dx, x1 - vLeft, new double[]{u1}, new double[]{u2}) &&
-            cliptest(dx, vRight - x1, new double[]{u1}, new double[]{u2}) &&
-            cliptest(-dy, y1 - vTop, new double[]{u1}, new double[]{u2}) &&
-            cliptest(dy, vBottom - y1, new double[]{u1}, new double[]{u2})) {
+        if (cliptest(-dx, x1 - vLeft, new double[] { u1 }, new double[] { u2 }) &&
+                cliptest(dx, vRight - x1, new double[] { u1 }, new double[] { u2 }) &&
+                cliptest(-dy, y1 - vTop, new double[] { u1 }, new double[] { u2 }) &&
+                cliptest(dy, vBottom - y1, new double[] { u1 }, new double[] { u2 })) {
             if (u2 < 1.0) {
                 p2[0] = x1 + u2 * dx;
                 p2[1] = y1 + u2 * dy;
@@ -280,7 +283,6 @@ class Line2D extends Shape {
         return new Line2D(x1, y1, x2, y2, selected);
     }
 
-    /** Draw line using DDA (Digital Differential Analyzer) algorithm */
     public void drawLineDDA(Graphics2D g2, int x1, int y1, int x2, int y2) {
 
         int dx = x2 - x1;
@@ -309,7 +311,6 @@ class Line2D extends Shape {
         }
     }
 
-    /** Draw line using Bresenham's line algorithm */
     public void drawLineBresenham(Graphics2D g2, int x1, int y1, int x2, int y2) {
         int dx = Math.abs(x2 - x1);
         int dy = Math.abs(y2 - y1);
@@ -387,7 +388,7 @@ class Circle2D extends Shape {
         Graphics2D g2 = (Graphics2D) g;
         Utils.prepareShapeGraphics(g2, selected, highlight);
         if (app != null) {
-            drawCircleBresenham(g2, cx + offsetX, cy + offsetY, radius);
+            drawCircleBresenham(g2, cx, cy, offsetX, offsetY, radius, app, vLeft, vTop, vRight, vBottom);
         } else {
             g2.drawOval(cx + offsetX - radius, cy + offsetY - radius, 2 * radius, 2 * radius);
         }
@@ -429,34 +430,45 @@ class Circle2D extends Shape {
         return new Circle2D(cx, cy, radius, selected);
     }
 
-    /** Draw circle using Bresenham's circle algorithm */
-    private void drawCircleBresenham(Graphics2D g2, int cx, int cy, int radius) {
+    private void symetricalDraw(Graphics2D g2, int cx, int cy, int offsetX, int offsetY, int x, int y, PaintApp app,int vLeft, int vTop, int vRight, int vBottom) {
+        // Draw standard 8 symmetric points with g2.drawLine for exact Bresenham circle pixels
+        Line2D oct1 = new Line2D(cx + x, cy + y, cx + x, cy + y, selected);
+        oct1.draw(g2, offsetX, offsetY, false, app, vLeft, vTop, vRight, vBottom);
+        Line2D oct2 = new Line2D(cx - x, cy + y, cx - x, cy + y, selected);
+        oct2.draw(g2, offsetX, offsetY, false, app, vLeft, vTop, vRight, vBottom);
+        Line2D oct3 = new Line2D(cx + x, cy - y, cx + x, cy - y, selected);
+        oct3.draw(g2, offsetX, offsetY, false, app, vLeft, vTop, vRight, vBottom);
+        Line2D oct4 = new Line2D(cx - x, cy - y, cx - x, cy - y, selected);
+        oct4.draw(g2, offsetX, offsetY, false, app, vLeft, vTop, vRight, vBottom);
+        Line2D oct5 = new Line2D(cx + y, cy + x, cx + y, cy + x, selected);
+        oct5.draw(g2, offsetX, offsetY, false, app, vLeft, vTop, vRight, vBottom);
+        Line2D oct6 = new Line2D(cx - y, cy + x, cx - y, cy + x, selected);
+        oct6.draw(g2, offsetX, offsetY, false, app, vLeft, vTop, vRight, vBottom);
+        Line2D oct7 = new Line2D(cx + y, cy - x, cx + y, cy - x, selected);
+        oct7.draw(g2, offsetX, offsetY, false, app, vLeft, vTop, vRight, vBottom);
+        Line2D oct8 = new Line2D(cx - y, cy - x, cx - y, cy - x, selected);
+        oct8.draw(g2, offsetX, offsetY, false, app, vLeft, vTop, vRight, vBottom);
+    }
+
+    private void drawCircleBresenham(Graphics2D g2, int cx, int cy, int offsetX, int offsetY, int radius, PaintApp app, int vLeft, int vTop, int vRight, int vBottom) {
         int x = 0;
         int y = radius;
         int p = 3 - 2 * radius;
 
-        while (x < y) {
-            // Draw all 8 octants
-            g2.drawLine(cx + x, cy + y, cx + x, cy + y); // Octant 1
-            g2.drawLine(cx - x, cy + y, cx - x, cy + y); // Octant 2
-            g2.drawLine(cx + x, cy - y, cx + x, cy - y); // Octant 4
-            g2.drawLine(cx - x, cy - y, cx - x, cy - y); // Octant 3
-            g2.drawLine(cx + y, cy + x, cx + y, cy + x); // Octant 8
-            g2.drawLine(cx - y, cy + x, cx - y, cy + x); // Octant 7
-            g2.drawLine(cx + y, cy - x, cx + y, cy - x); // Octant 5
-            g2.drawLine(cx - y, cy - x, cx - y, cy - x); // Octant 6
+        symetricalDraw(g2, cx, cy, offsetX, offsetY, x, y, app, vLeft, vTop, vRight, vBottom);
 
+        while (x < y) {
+            x++;
             if (p < 0) {
                 p = p + 4 * x + 6;
             } else {
                 p = p + 4 * (x - y) + 10;
                 y--;
             }
-            x++;
+            symetricalDraw(g2, cx, cy, offsetX, offsetY, x, y, app, vLeft, vTop, vRight, vBottom);
         }
     }
 }
-
 class Polygon2D extends Shape {
     ArrayList<Point2D> vertices;
 
